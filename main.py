@@ -14,6 +14,7 @@ from flask_cors import CORS
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
+from pandas import DataFrame
 
 app = Flask(__name__)
 # app.wsgi_app = ReverseProxied(app.wsgi_app)
@@ -174,8 +175,25 @@ def access_realtime(auth):
     data = auth.data().realtime().get(
         ids=f"ga:{ids}",
         metrics='rt:pageviews',
-        dimensions='rt:pagePath,rt:minutesAgo,rt:city,rt:pageTitle').execute()
+        dimensions='rt:pagePath,rt:minutesAgo,rt:country,rt:city,rt:pageTitle',
+        filters="ga:pagePath=~/primo-explore/fulldisplay?/*"
+    ).execute()
     return jsonify(data)
+
+
+@app.route("/realtime/pages")
+@require_access("analytics", "v3")
+def list_realtime_urls(auth):
+    ids = require_analytics_id()
+    data = auth.data().realtime().get(
+        ids=f"ga:{ids}",
+        metrics='rt:pageviews',
+        dimensions='rt:pagePath,rt:minutesAgo,rt:country,rt:city,rt:pageTitle',
+    ).execute()
+    columns = list(header["name"] for header in data["columnHeaders"])
+    df = DataFrame(data=data["rows"][3:], columns=columns)
+    queries_stripped = df["rt:pagePath"].replace([r"\?.+$"], [""], regex=True)
+    return jsonify({"pages": list(queries_stripped.unique())})
 
 
 def require_analytics_id():
