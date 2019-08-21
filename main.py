@@ -36,13 +36,23 @@ scopes = [
 ]
 
 
+class SetupError(Exception):
+    pass
+
+
+@app.before_first_request
+def validate_environment():
+    if "API_URL" not in os.environ:
+        os.environ["API_URL"] = ""
+
+
 @app.route("/")
 def hello():
     return jsonify({
         "message": "Hello World",
         "status": "Online",
         "upstream": {
-            "GDrive": not app.config["creds"] and "Unauthorized" or app.config[
+            "Google Analytics": not app.config["creds"] and "Unauthorized" or app.config[
                 "creds"].valid and "Connected" or "Paused"
         },
         "host": request.host_url,
@@ -54,7 +64,8 @@ def hello():
 def oauth_check():
     if all(re.match(path, request.path) is None for path in oauth_whitelist):
         if not app.config["creds"] or not app.config["creds"].valid:
-            app.config["redirect"] = os.getenv("API_URL") + url_for(request.endpoint)
+            if request.endpoint:
+                app.config["redirect"] = os.getenv("API_URL") + url_for(request.endpoint)
             return redirect(os.getenv("API_URL") + url_for("oauth_authorize"))
 
 
