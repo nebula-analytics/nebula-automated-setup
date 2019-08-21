@@ -38,6 +38,10 @@ scopes = [
     "https://www.googleapis.com/auth/analytics.readonly"
 ]
 
+discovery_urls = {
+    ("analytics", "v4"): "https://analyticsreporting.googleapis.com/$discovery/rest"
+}
+
 
 class SetupError(Exception):
     pass
@@ -46,7 +50,7 @@ class SetupError(Exception):
 @app.before_first_request
 def validate_environment():
     if "API_URL" not in os.environ:
-        os.environ["API_URL"] = "http://localhost:5000"
+        os.environ["API_URL"] = "https://localhost:5000"
 
 
 @app.route("/")
@@ -92,7 +96,7 @@ def require_access(service_name, version):
     return receive
 
 
-@app.route("/oauth/callback")
+@app.route("/oauth/callback/")
 def oauth_callback():
     try:
         state = request.args["state"]
@@ -100,7 +104,11 @@ def oauth_callback():
             'credentials.json', scopes, state=state)
         flow.redirect_uri = os.getenv("API_URL") + url_for("oauth_callback")
 
-        auth_url = request.url.replace("http://", "https://")
+        auth_url = request.url
+
+        if auth_url.startswith("http://"):
+            print("replace with https")
+            auth_url = "https" + auth_url[4:]
         flow.fetch_token(authorization_response=auth_url)
         app.config["creds"] = flow.credentials
         with open(app.config["pickle"], "wb") as fin:
@@ -111,14 +119,14 @@ def oauth_callback():
     return redirect(app.config["redirect"])
 
 
-@app.route("/oauth/authorize")
+@app.route("/oauth/authorize/")
 def oauth_authorize():
     if "return_to" in request.args:
         app.config["redirect"] = request.args["return_to"]
 
     # Try loading in the token from previous session
     if not app.config["creds"] and os.path.exists(app.config["pickle"]):
-        with open(app.config["pickle"], "r") as fin:
+        with open(app.config["pickle"], "rb") as fin:
             app.config["creds"] = pickle.load(fin)
 
     # Check for token expiry
@@ -141,6 +149,45 @@ def oauth_authorize():
     )
     # For some reason redirect_uri is not attached by the lib
     return redirect(auth_url)
+
+
+@app.route("/analytics")
+@require_access("analyticsreporting", "v4")
+def access_reporting(auth):
+    ids = require_analytics_id()
+    data = auth.reports().batchGet(
+        body={
+            'reportRequests': [
+                {
+                    'viewId': ids,
+                    'dateRanges': [{'startDate': '7daysAgo', 'endDate': 'today'}],
+                    'dimensions': [{"name": "ga:pagePath"}, {"name": "ga:pageTitle"}],
+                    'metrics': [{'expression': 'ga:pageviews'}, {'expression': 'ga:uniquePageviews'},
+                                {'expression': 'ga:timeOnPage'}]
+                }]
+        }
+    ).execute()
+    return jsonify(data)
+
+
+@app.route("/realtime")
+@require_access("analytics", "v3")
+def access_realtime(auth):
+    ids = require_analytics_id()
+    data = auth.data().realtime().get(
+        ids=f"ga:{ids}",
+        metrics='rt:pageviews',
+        dimensions='rt:pagePath').execute()
+    return jsonify(data)
+
+
+def require_analytics_id():
+    if "ga" not in request.args:
+        raise Exception("Google analytics required")
+    ga_id = request.args.get("ga")
+    if not re.match("^[0-9]+$", ga_id):
+        raise Exception("Invalid GA ID")
+    return ga_id
 
 
 if __name__ == '__main__':
