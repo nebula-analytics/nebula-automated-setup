@@ -23,6 +23,9 @@ app.config["creds"] = None
 app.config["pickle"] = "./token.pickle"
 app.config["state"] = None
 app.config["redirect"] = "/"
+os.environ['DEBUG'] = '1'
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+app.config["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 # Items here will not be redirected to authenticate
 oauth_whitelist = [
@@ -43,7 +46,7 @@ class SetupError(Exception):
 @app.before_first_request
 def validate_environment():
     if "API_URL" not in os.environ:
-        os.environ["API_URL"] = ""
+        os.environ["API_URL"] = "http://localhost:5000"
 
 
 @app.route("/")
@@ -97,8 +100,8 @@ def oauth_callback():
             'credentials.json', scopes, state=state)
         flow.redirect_uri = os.getenv("API_URL") + url_for("oauth_callback")
 
-        flow.fetch_token(
-            authorization_response=request.url)
+        auth_url = request.url.replace("http://", "https://")
+        flow.fetch_token(authorization_response=auth_url)
         app.config["creds"] = flow.credentials
         with open(app.config["pickle"], "wb") as fin:
             pickle.dump(app.config["creds"], fin)
@@ -141,4 +144,4 @@ def oauth_authorize():
 
 
 if __name__ == '__main__':
-    app.run(threaded=False, debug=True)
+    app.run(threaded=False, debug=True, ssl_context='adhoc')
