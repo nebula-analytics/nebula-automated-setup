@@ -23,9 +23,6 @@ app.config["creds"] = None
 app.config["pickle"] = "./token.pickle"
 app.config["state"] = None
 app.config["redirect"] = "/"
-os.environ['DEBUG'] = '1'
-os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
-app.config["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 # Items here will not be redirected to authenticate
 oauth_whitelist = [
