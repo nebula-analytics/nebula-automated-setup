@@ -174,7 +174,7 @@ def access_realtime(auth):
     data = auth.data().realtime().get(
         ids=f"ga:{ids}",
         metrics='rt:pageviews',
-        dimensions='rt:pagePath').execute()
+        dimensions='rt:pagePath,rt:minutesAgo,rt:city,rt:pageTitle').execute()
     return jsonify(data)
 
 
