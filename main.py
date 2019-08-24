@@ -149,7 +149,12 @@ def oauth_authorize():
     return redirect(auth_url)
 
 
-@app.route("/analytics")
+@app.route("/oauth/deauthorize/")
+def logout():
+    pass
+
+
+@app.route("/analytics/")
 @require_access("analyticsreporting", "v4")
 def access_reporting(auth):
     ids = require_analytics_id()
@@ -168,7 +173,7 @@ def access_reporting(auth):
     return jsonify(data)
 
 
-@app.route("/realtime")
+@app.route("/realtime/")
 @require_access("analytics", "v3")
 def access_realtime(auth):
     ids = require_analytics_id()
@@ -176,12 +181,13 @@ def access_realtime(auth):
         ids=f"ga:{ids}",
         metrics='rt:pageviews',
         dimensions='rt:pagePath,rt:minutesAgo,rt:country,rt:city,rt:pageTitle',
-        filters="ga:pagePath=~/primo-explore/fulldisplay?/*"
+        filters="ga:pagePath=~/primo-explore/fulldisplay?/*",
+        sort="rt:minutesAgo"
     ).execute()
     return jsonify(data)
 
 
-@app.route("/realtime/pages")
+@app.route("/realtime/pages/")
 @require_access("analytics", "v3")
 def list_realtime_urls(auth):
     ids = require_analytics_id()
@@ -189,11 +195,35 @@ def list_realtime_urls(auth):
         ids=f"ga:{ids}",
         metrics='rt:pageviews',
         dimensions='rt:pagePath,rt:minutesAgo,rt:country,rt:city,rt:pageTitle',
+        sort="rt:minutesAgo"
     ).execute()
     columns = list(header["name"] for header in data["columnHeaders"])
     df = DataFrame(data=data["rows"][3:], columns=columns)
     queries_stripped = df["rt:pagePath"].replace([r"\?.+$"], [""], regex=True)
     return jsonify({"pages": list(queries_stripped.unique())})
+
+
+@app.route("/analytics/views/")
+@require_access("analytics", "v3")
+def show_accounts(auth):
+    accounts = auth.management().accounts().list().execute()
+    results = []
+    for account in accounts["items"]:
+        account_id = account["id"]
+        properties = auth.management().webproperties().list(accountId=account_id).execute()
+        for webp in properties["items"]:
+            web_id = webp["id"]
+            views = auth.management().profiles().list(
+                accountId=account_id,
+                webPropertyId=web_id).execute()
+            for view in views["items"]:
+                results.append(view)
+    return jsonify(
+        {
+            "user": accounts,
+            "views": results
+        }
+    )
 
 
 def require_analytics_id():
