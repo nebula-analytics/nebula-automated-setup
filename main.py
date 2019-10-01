@@ -1,5 +1,7 @@
 from __future__ import print_function
 
+import logging
+from logging.handlers import RotatingFileHandler
 import inspect
 import os
 import os.path
@@ -7,8 +9,11 @@ import pickle
 import re
 import traceback as tb
 from typing import Callable
+import json
+import yaml
+import subprocess
 
-from flask import Flask, jsonify, redirect, request
+from flask import Flask, jsonify, redirect, request, render_template
 from flask import url_for
 from flask_cors import CORS
 from google.auth.transport.requests import Request
@@ -16,7 +21,7 @@ from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from pandas import DataFrame
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='.')
 # app.wsgi_app = ReverseProxied(app.wsgi_app)
 CORS(app)
 
@@ -24,6 +29,7 @@ app.config["creds"] = None
 app.config["pickle"] = "./token.pickle"
 app.config["state"] = None
 app.config["redirect"] = "/"
+viewIDs = []
 
 # Items here will not be redirected to authenticate
 oauth_whitelist = [
@@ -52,25 +58,41 @@ def validate_environment():
 
 
 @app.route("/")
-def hello():
-    return jsonify({
-        "message": "Hello World",
-        "status": "Online",
-        "upstream": {
-            "Google Analytics": not app.config["creds"] and "Unauthorized" or app.config[
-                "creds"].valid and "Connected" or "Paused"
-        },
-        "host": request.host_url,
-        "auth_url": os.getenv("API_URL") + url_for("oauth_authorize"),
-    })
+def index():
+    return render_template('gaauthentication.html')
 
 
-@app.before_request
+@app.route("/auth", methods=["POST"])
 def oauth_check():
     if all(re.match(path, request.path) is None for path in oauth_whitelist):
         if not app.config["creds"] or not app.config["creds"].valid:
-            if request.endpoint:
-                app.config["redirect"] = os.getenv("API_URL") + url_for(request.endpoint)
+
+            # Retrieve data from POST request with form's name
+            client_secret = request.form['client_secret']
+            client_id = request.form['client_id']
+            primo_url = request.form['primo_url']
+            primo_key = request.form['primo_key']
+
+            with open("credentials.json", "r") as jsonFile:
+                data = json.load(jsonFile)
+
+            tmp = data["web"]
+            data["web"]["client_secret"] = client_secret
+            data["web"]["client_id"] = client_id
+            with open("credentials.json", "w") as jsonFile:
+                json.dump(data, jsonFile)
+            # New dict from the Form for necessary configuration
+            new_yaml_data_dict = {
+                'primo': {
+                    'host': primo_url,
+                    'api_key': primo_key
+                }
+            }
+
+            with open('config.yaml.secret', 'w') as yamlfile:
+                yaml.safe_dump(new_yaml_data_dict, yamlfile, default_flow_style=False, allow_unicode=True,
+                               encoding=None)  # Also note the safe_dump
+            app.config["redirect"] = "/viewslist"
             return redirect(os.getenv("API_URL") + url_for("oauth_authorize"))
 
 
@@ -92,6 +114,61 @@ def require_access(service_name, version):
         return wrapper
 
     return receive
+
+
+@app.route("/viewslist")
+@require_access("analytics", "v3")
+def showListofViews(auth):
+    accounts = auth.management().accounts().list().execute()
+
+    for account in accounts["items"]:
+        account_id = account["id"]
+        properties = auth.management().webproperties().list(accountId=account_id).execute()
+        for webp in properties["items"]:
+            web_id = webp["id"]
+            views = auth.management().profiles().list(
+                accountId=account_id,
+                webPropertyId=web_id).execute()
+            for view in views["items"]:
+                viewIDs.append(view['id'])
+    print(viewIDs)
+    return render_template('viewsList.html', viewIDs=viewIDs)
+
+
+@app.route("/finalise")
+def finalise():
+    viewID = request.form['viewIDPicker']
+    errors = []
+
+    if not os.path.exists('/token.pickle'):
+        errors.append("Cannot find token.pickle!!!")
+    if viewID not in viewIDs:
+        errors.append("View ID does not exist!!!")
+    if not os.path.exists('/config.yaml'):
+        errors.append("Cannot find config.yaml!!!")
+    if errors:
+        return render_template("/errors.html", errors=errors)
+
+    path_for_config_worker = os.path.dirname(__file__) + "/configuration/token.pickle"
+
+    os.replace(os.path.abspath('./token.pickle'), path_for_config_worker)
+    new_yaml_data_dict = {
+        'view_id': viewID,
+        'path_to_credentials': path_for_config_worker
+    }
+    with open('config.yaml.secret', 'r') as yamlfile:
+        cur_yaml = yaml.safe_load(yamlfile)  # Note the safe_load
+        cur_yaml['analytics'].update(new_yaml_data_dict)
+
+    if cur_yaml:
+        with open('config.yaml.secret', 'w') as yamlfile:
+            yaml.safe_dump(cur_yaml, yamlfile, default_flow_style=False, allow_unicode=True,
+                           encoding=None)  # Also note the safe_dump
+    path_for_config_worker = os.path.dirname(__file__) + "/configuration/config.yaml.secret"
+
+    os.replace(os.path.abspath('./config.yaml.secret'), path_for_config_worker)
+
+    return
 
 
 @app.route("/oauth/callback/")
@@ -117,9 +194,10 @@ def oauth_callback():
     return redirect(app.config["redirect"])
 
 
-@app.route("/oauth/authorize/")
+@app.route("/oauth/authorize/", methods=['GET', 'POST'])
 def oauth_authorize():
     if "return_to" in request.args:
+        print("i'm here in app redirect")
         app.config["redirect"] = request.args["return_to"]
 
     # Try loading in the token from previous session
