@@ -9,6 +9,7 @@ import pickle
 import re
 import traceback as tb
 from typing import Callable
+from pickle import UnpicklingError
 import json
 import yaml
 import subprocess
@@ -21,12 +22,17 @@ from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from pandas import DataFrame
 
+
+class AuthenticationException(Exception):
+    pass
+
+
 app = Flask(__name__, template_folder='.')
 # app.wsgi_app = ReverseProxied(app.wsgi_app)
 CORS(app)
 
 app.config["creds"] = None
-app.config["pickle"] = "./token.pickle"
+app.config["pickle"] = os.path.dirname(__file__) + "/configuration/token.pickle"
 app.config["state"] = None
 app.config["redirect"] = "/"
 viewIDs = []
@@ -66,20 +72,19 @@ def index():
 def oauth_check():
     if all(re.match(path, request.path) is None for path in oauth_whitelist):
         if not app.config["creds"] or not app.config["creds"].valid:
-
             # Retrieve data from POST request with form's name
             client_secret = request.form['client_secret']
             client_id = request.form['client_id']
             primo_url = request.form['primo_url']
             primo_key = request.form['primo_key']
 
-            with open("credentials.json", "r") as jsonFile:
+            with open("./configuration/credentials.json", "r") as jsonFile:
                 data = json.load(jsonFile)
 
             tmp = data["web"]
             data["web"]["client_secret"] = client_secret
             data["web"]["client_id"] = client_id
-            with open("credentials.json", "w") as jsonFile:
+            with open("./configuration/credentials.json", "w") as jsonFile:
                 json.dump(data, jsonFile)
             # New dict from the Form for necessary configuration
             new_yaml_data_dict = {
@@ -89,7 +94,7 @@ def oauth_check():
                 }
             }
 
-            with open('config.yaml.secret', 'w') as yamlfile:
+            with open('./configuration/config.yaml.secret', 'w') as yamlfile:
                 yaml.safe_dump(new_yaml_data_dict, yamlfile, default_flow_style=False, allow_unicode=True,
                                encoding=None)  # Also note the safe_dump
             app.config["redirect"] = "/viewslist"
@@ -103,16 +108,35 @@ def require_access(service_name, version):
     :param version:
     :return:
     """
+    if not os.path.isfile(app.config['pickle']):
+        def receive(fn: Callable):
+            def wrapper(*args, **kwargs):
+                kwargs["auth"] = build(service_name, version, credentials=app.config["creds"])
+                return fn(*args, **kwargs)
 
-    def receive(fn: Callable):
-        def wrapper(*args, **kwargs):
-            kwargs["auth"] = build(service_name, version, credentials=app.config["creds"])
-            return fn(*args, **kwargs)
+            wrapper.__name__ = fn.__name__
+            wrapper.__signature__ = inspect.signature(fn)
+            return wrapper
+    else:
+        def receive(fn: Callable):
+            def wrapper(*args, **kwargs):
+                try:
+                    with open(app.config['pickle'], "rb") as tokenf:
+                        token = pickle.load(tokenf)
+                        if not token:
+                            raise AuthenticationException(
+                                f"The provided token file '{app.config['pickle']}' was empty")
+                        auth = build(service_name, version, credentials=token, cache_discovery=False)
+                        args = list(args)
+                        args.append(auth)
+                        return fn(*args, **kwargs)
+                except UnpicklingError:
+                    raise AuthenticationException(
+                        f"The provided token file '{app.config['pickle']}' is corrupted and could not be loaded")
 
-        wrapper.__name__ = fn.__name__
-        wrapper.__signature__ = inspect.signature(fn)
-        return wrapper
-
+            wrapper.__name__ = fn.__name__
+            wrapper.__signature__ = inspect.signature(fn)
+            return wrapper
     return receive
 
 
@@ -120,7 +144,6 @@ def require_access(service_name, version):
 @require_access("analytics", "v3")
 def showListofViews(auth):
     accounts = auth.management().accounts().list().execute()
-
     for account in accounts["items"]:
         account_id = account["id"]
         properties = auth.management().webproperties().list(accountId=account_id).execute()
@@ -135,40 +158,33 @@ def showListofViews(auth):
     return render_template('viewsList.html', viewIDs=viewIDs)
 
 
-@app.route("/finalise")
+@app.route("/finalise", methods=['GET', 'POST'])
 def finalise():
     viewID = request.form['viewIDPicker']
     errors = []
 
-    if not os.path.exists('/token.pickle'):
+    if not os.path.exists('./configuration/token.pickle'):
         errors.append("Cannot find token.pickle!!!")
     if viewID not in viewIDs:
         errors.append("View ID does not exist!!!")
-    if not os.path.exists('/config.yaml'):
-        errors.append("Cannot find config.yaml!!!")
+    if not os.path.exists('./configuration/config.yaml.secret'):
+        errors.append("Cannot find config.yaml.secret!!!")
     if errors:
         return render_template("/errors.html", errors=errors)
 
-    path_for_config_worker = os.path.dirname(__file__) + "/configuration/token.pickle"
-
-    os.replace(os.path.abspath('./token.pickle'), path_for_config_worker)
     new_yaml_data_dict = {
         'view_id': viewID,
-        'path_to_credentials': path_for_config_worker
+        'path_to_credentials': os.path.abspath("./configuration/token.pickle")
     }
-    with open('config.yaml.secret', 'r') as yamlfile:
+    with open('./configuration/config.yaml.secret', 'r') as yamlfile:
         cur_yaml = yaml.safe_load(yamlfile)  # Note the safe_load
-        cur_yaml['analytics'].update(new_yaml_data_dict)
 
     if cur_yaml:
-        with open('config.yaml.secret', 'w') as yamlfile:
+        with open('./configuration/config.yaml.secret', 'w') as yamlfile:
             yaml.safe_dump(cur_yaml, yamlfile, default_flow_style=False, allow_unicode=True,
                            encoding=None)  # Also note the safe_dump
-    path_for_config_worker = os.path.dirname(__file__) + "/configuration/config.yaml.secret"
 
-    os.replace(os.path.abspath('./config.yaml.secret'), path_for_config_worker)
-
-    return
+    return render_template("successful.html")
 
 
 @app.route("/oauth/callback/")
@@ -176,7 +192,7 @@ def oauth_callback():
     try:
         state = request.args["state"]
         flow = Flow.from_client_secrets_file(
-            'credentials.json', scopes, state=state)
+            './configuration/credentials.json', scopes, state=state)
         flow.redirect_uri = os.getenv("API_URL") + url_for("oauth_callback")
 
         auth_url = request.url
@@ -215,7 +231,7 @@ def oauth_authorize():
         return redirect(app.config["redirect"])
 
     flow = Flow.from_client_secrets_file(
-        'credentials.json', scopes)
+        './configuration/credentials.json', scopes)
     flow.redirect_uri = os.getenv("API_URL") + url_for("oauth_callback")
 
     auth_url, app.config["state"] = flow.authorization_url(
