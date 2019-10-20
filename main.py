@@ -90,7 +90,13 @@ def oauth_check():
             new_yaml_data_dict = {
                 'primo': {
                     'host': primo_url,
-                    'api_key': primo_key
+                    'api_key': primo_key,
+                    'contexts': ["L", "PC"],
+                    'common_fields': ['title', 'identifier', "doc_id", "language", "_type"],
+                    'excluded_fields': ["_id"],
+                    'name_mapping': {"lang3": "language", "pnx_id": "doc_id"},
+                    'key_by':""
+
                 }
             }
 
@@ -183,7 +189,8 @@ def finalise():
         with open('./configuration/config.yaml.secret', 'w') as yamlfile:
             yaml.safe_dump(cur_yaml, yamlfile, default_flow_style=False, allow_unicode=True,
                            encoding=None)  # Also note the safe_dump
-
+    directory = "mv " + f"{os.path.abspath('./configuration') +'/* ' + os.path.abspath('../nebula-background-worker/')}"
+    subprocess.call(directory, shell=True)
     return render_template("successful.html")
 
 
