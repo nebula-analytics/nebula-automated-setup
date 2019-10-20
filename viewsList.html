@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8"/>
+    <title></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/js/bootstrap.min.js"></script>
+
+</head>
+
+<body>
+<div class="container">
+    <form class="well form-horizontal" action="/finalise" method="POST" id="viewPicker_form">
+        <fieldset>
+            <legend>
+                <h2><b>Please choose a view ID from the list below</b></h2>
+            </legend>
+            <br>
+
+            <div class="form-group">
+                <label class="col-md-4 control-label">Google Analytics View IDs:</label>
+                <div class="col-md-4 inputGroupContainer">
+                    {% if viewIDs %}
+                        <select class="form-control form-control-lg" name="viewIDPicker">
+                            {% for viewID in viewIDs %}
+                                <option value="{{ viewID }}">{{ viewID}}</option>
+                            {% endfor %}
+                        </select>
+                    {% else %}
+                        <div class="alert alert-warning" role="alert">
+                            <strong>Warning!</strong> There is no view ID connected to this Google Analytics account.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="col-md-4 control-label"></label>
+                <div class="col-md-4"><br>
+
+                    <button type="submit" class="btn btn-warning">SUBMIT <span
+                            class="glyphicon glyphicon-send"></span>
+                    </button>
+                </div>
+            </div>
+        </fieldset>
+    </form>
+</div>
+</div><!-- /.container -->
+
+</body>
+</html>
+
