@@ -178,18 +178,19 @@ def finalise():
     if errors:
         return render_template("/errors.html", errors=errors)
 
+    subdir = f"{os.path.abspath('./configuration') + '/token.pickle'}"
     new_yaml_data_dict = {
         'view_id': viewID,
-        'path_to_credentials': os.path.abspath("./configuration/token.pickle")
+        'path_to_credentials': subdir
     }
-    with open('./configuration/config.yaml.secret', 'r') as yamlfile:
-        cur_yaml = yaml.safe_load(yamlfile)  # Note the safe_load
+    with open('./configuration/config.yaml.secret') as f:
+        doc = yaml.load(f)
 
-    if cur_yaml:
-        with open('./configuration/config.yaml.secret', 'w') as yamlfile:
-            yaml.safe_dump(cur_yaml, yamlfile, default_flow_style=False, allow_unicode=True,
-                           encoding=None)  # Also note the safe_dump
-    directory = "mv " + f"{os.path.abspath('./configuration') +'/* ' + os.path.abspath('../nebula-background-worker/')}"
+    doc['analytics'] = new_yaml_data_dict
+
+    with open('./configuration/config.yaml.secret', 'w') as f:
+        yaml.dump(doc, f)
+    directory = "mv " + os.path.abspath('./configuration/config.yaml.secret') + " " + os.path.abspath('../nebula-background-worker/')
     subprocess.call(directory, shell=True)
     return render_template("successful.html")
 
