@@ -27,7 +27,7 @@ class AuthenticationException(Exception):
     pass
 
 
-app = Flask(__name__, template_folder='.')
+app = Flask(__name__, template_folder='templates')
 # app.wsgi_app = ReverseProxied(app.wsgi_app)
 CORS(app)
 
