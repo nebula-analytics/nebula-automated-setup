@@ -2,27 +2,57 @@
 
 {% block form %}
     <div class="form-group">
-        <label class="control-label" for="client_id">
-            {% if not session["analytics"] %}
-                You need to setup google cloud credentials in order to continue
-                <div class="form-group">
-                    <a href="{{ url_for("setup_google_cloud") }}" class="btn btn-secondary">
-                        back
-                        {#                    <span class="oi oi-check" aria-hidden="true"></span>#}
-                    </a>
+        {% if not views %}
+            <label class="control-label" for="client_id">
+                {% if not session["google_cloud"] %}
+                    You need to setup google cloud credentials in order to continue
+                    <div class="form-group">
+                        <a href="{{ url_for("setup_google_cloud") }}" class="btn btn-secondary">
+                            back
+                            {#                    <span class="oi oi-check" aria-hidden="true"></span>#}
+                        </a>
+                    </div>
+                {% else %}
+                    <p>
+                        In order for nebula to access google analytics, you will need to authenticate with an account
+                        which has
+                        access to the desired analytics data.
+                    </p>
+                    <p>
+                        You may receive a warning telling you the token you generated has not been verified by google.
+                    </p>
+                    Click next to continue
+                {% endif %}
+            </label>
+        {% else %}
+            <div class="form-group">
+                <label class="control-label" for="view_select">Select the Analytics view associated with primo</label>
+                <div class="inputGroupContainer">
+                    <div class="input-group mb-3">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">
+                                <span class="oi oi-browser" title="View" aria-hidden="true"></span>
+                            </span>
+                        </div>
+                        <select name="view_id" class="custom-select" id="view_select">
+                            {% for i, value in views %}
+                                <option value="{{ value["id"] }}" {% if i ==0 %}selected{% endif %}>{{value["id"]}} ({{value["url"]}})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                 </div>
-            {% else %}
-                To get access to google analytics you will need to authenticate with an account which has
-                access to the desired analytics data.
-
-                You may receive a warning telling you the token you generated has not been verified by google.
-            {% endif %}
-        </label>
+                <small id="client_id_help" class="form-text text-muted">
+                    This allows us to interact with google cloud and act on your behalf for the given permissions
+                </small>
+            </div>
+        {% endif %}
 
 
     </div>
 {% endblock %}
 
-{% if not session["analytics"] %}
-    {% block submit_attrs %}disabled{% endblock %}
-{% endif %}
+{% block submit_attrs %}
+    {% if not session["google_cloud"] %}
+        disabled
+    {% endif %}
+{% endblock %}

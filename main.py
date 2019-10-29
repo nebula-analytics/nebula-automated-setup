@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import logging
+from collections import OrderedDict
 from logging.handlers import RotatingFileHandler
 import inspect
 import os
@@ -55,7 +56,7 @@ discovery_urls = {
 }
 
 progression = [
-    "about", "primo", "google_cloud", "analytics"
+    "about", "primo", "google_cloud", "analytics", "confirm_and_complete"
 ]
 
 
@@ -71,12 +72,12 @@ def validate_environment():
 
 @app.route("/")
 def index():
-    return render_template('gaauthentication.html')
+    return render_template("about.html", progression=get_progression("about"))
 
 
 @app.route("/setup/about")
 def about():
-    return
+    return redirect(url_for("index"))
 
 
 @app.route("/setup/primo", methods=["GET", "POST"])
@@ -96,14 +97,19 @@ def setup_primo():
         if valid:
             for field in fields:
                 state[field] = data.get(field)
+            if not state["primo_url"].startswith("https://"):
+                state["primo_url"] = "https://" + state["primo_url"]
+            if not state["primo_url"].endswith("/pnxs"):
+                state["primo_url"] = state["primo_url"] + "/pnxs"
             return redirect(url_for('setup_google_cloud'))
     return render_template('primo.html', progression=get_progression("primo"))
 
 
 @app.route("/setup/google_cloud", methods=["GET", "POST"])
 def setup_google_cloud():
+    print(session)
     if request.method == "POST":
-        fields = ["client_id", "client_key"]
+        fields = ["client_id", "client_secret"]
         data = request.form
         state = session.setdefault("google_cloud", {})
 
@@ -115,30 +121,104 @@ def setup_google_cloud():
                 valid = False
 
         if valid:
+            state.update({
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            })
             for field in fields:
                 state[field] = data.get(field)
+
+            if not state["client_id"].endswith(".apps.googleusercontent.com"):
+                state["client_id"] = state["client_id"] + ".apps.googleusercontent.com"
+
+            session["google_cloud"] = state
             return redirect(url_for('setup_analytics'))
     return render_template('google_cloud.html', progression=get_progression("google_cloud"))
 
 
 @app.route("/setup/analytics", methods=["GET", "POST"])
 def setup_analytics():
-    if request.method == "POST":
-        flash("TODO: Redirect")
+    print(session)
+    state = session.setdefault("analytics", {})
+    if "token" in state:
+        if request.method == "POST":
+            data = request.form
+            if "view_id" in data:
+                state.update({"view_id": data.get("view_id")})
+                session["analytics"] = state
+                return redirect(url_for("confirm_and_complete"))
+            flash("No idea how you managed to not pick any")
+        if "available_views" not in session:
+            auth = build("analytics", "v3", credentials=pickle.loads(state["token"]))
+            session["available_views"] = get_views(auth)
+        views = session["available_views"]
+        return render_template('analytics.html', progression=get_progression("analytics"), views=list(enumerate(views)))
+    else:
+        print(request.method)
+        print()
+        if request.method == "POST":
+            return redirect(url_for("oauth_authorize", return_to=url_for("setup_analytics")))
+
     return render_template('analytics.html', progression=get_progression("analytics"))
 
 
+@app.route("/setup/confirm_and_complete", methods=["GET", "POST"])
+def confirm_and_complete():
+    if request.method == "POST":
+        output_token_pickle()
+        output_config_yaml()
+        session["confirm_and_complete"] = True
+        redirect(url_for("successful"))
+        flash("Your configuration has been saved, run docker-compose restart to put changes in effect")
+
+    sensitive_fields = ["token", "primo_key"]
+    state = {
+        key: list(
+            (skey, str(value) if skey not in sensitive_fields else "*" * min(len(value), 50))
+            for skey, value in session[key].items())
+        for key in ["primo", "analytics"]
+    }
+
+    return render_template("complete.html", state=state, progression=get_progression("confirm_and_complete"))
+
+
+@app.route("/setup/success")
+def done():
+    render_template("successful.html", progression=get_progression("confirm_and_complete"))
+
+def output_config_yaml():
+    target_directory = os.getenv("CONFIG_DIR", "./configuration")
+    config_file = os.path.join(target_directory, "config.yaml.docker")
+    with open(config_file, "w") as config_f:
+        yaml.safe_dump({
+            "primo": {
+                "host": session["primo"]["primo_url"],
+                "api_key": session["primo"]["primo_key"],
+            }
+        })
+
+
+def output_token_pickle():
+    target_directory = os.getenv("CONFIG_DIR", "./configuration")
+    token_file = os.path.join(target_directory, "token.pickle")
+    with open(token_file, "wb") as token_f:
+        token_f.write(session["analytics"]["token"])
+
+
 def get_progression(current_step: str):
-    return {
-        progression[i]: {
+    return OrderedDict(
+        (progression[i], {
             "class": "active" if current_step == progression[i] else "",
             "url": "/setup/{}".format(progression[i]),
-            "next": progression[i] if i < len(progression) else None
-        }
+            "next": progression[i] if i < len(progression) else None,
+            "completed": bool(session.get(progression[i]))
+        })
         for i in range(len(progression))
-        if i <= progression.index(current_step)
+        if i <= progression.index(current_step) or i > 0 and session.get(progression[i - 1], False) or session.get(
+            progression[i])
 
-    }
+    )
 
 
 def update_config(new: dict):
@@ -238,9 +318,8 @@ def require_access(service_name, version):
     return receive
 
 
-@app.route("/viewslist")
-@require_access("analytics", "v3")
-def showListofViews(auth):
+def get_views(auth):
+    view_list = []
     accounts = auth.management().accounts().list().execute()
     for account in accounts["items"]:
         account_id = account["id"]
@@ -251,9 +330,15 @@ def showListofViews(auth):
                 accountId=account_id,
                 webPropertyId=web_id).execute()
             for view in views["items"]:
-                viewIDs.append(view['id'])
-    print(viewIDs)
-    return render_template('viewsList.html', viewIDs=viewIDs)
+                view_list.append({"id": view['id'], "url": view.get("websiteUrl", '')})
+
+    return view_list
+
+
+@app.route("/viewslist")
+@require_access("analytics", "v3")
+def showListofViews(auth):
+    return render_template('viewsList.html', viewIDs=get_views(auth))
 
 
 @app.route("/finalise", methods=['GET', 'POST'])
@@ -290,49 +375,59 @@ def finalise():
 
 @app.route("/oauth/callback/")
 def oauth_callback():
+    state = request.args.get("state", None)
+    if not state:
+        return render_template("error.html", errors=["No state provided to callback"])
+
+    host = os.getenv("API_URL", request.host_url[:-1])
     try:
-        state = request.args["state"]
-        flow = Flow.from_client_secrets_file(
-            './configuration/credentials.json', scopes, state=state)
-        flow.redirect_uri = os.getenv("API_URL") + url_for("oauth_callback")
+        authorization = {"web": session["google_cloud"]}
+
+        flow = Flow.from_client_config(authorization, scopes, state=state)
+        flow.redirect_uri = "{}{}".format(host, url_for("oauth_callback"))
 
         auth_url = request.url
 
         if auth_url.startswith("http://"):
-            print("replace with https")
             auth_url = "https" + auth_url[4:]
+
         flow.fetch_token(authorization_response=auth_url)
-        app.config["creds"] = flow.credentials
+
+        sess_state = session["analytics"]
+        sess_state.update({"token": pickle.dumps(flow.credentials)})
+        session["analytics"] = sess_state
+
         with open(app.config["pickle"], "wb") as fin:
             pickle.dump(app.config["creds"], fin)
-            app.config["state"] = None
     except:
         tb.print_exc()
-    return redirect(app.config["redirect"])
+        return render_template("error.html", error=["An exception occured while attempting to complete the oauth flow"])
+    return redirect(session["redirect"])
 
 
 @app.route("/oauth/authorize/", methods=['GET', 'POST'])
 def oauth_authorize():
     if "return_to" in request.args:
-        app.config["redirect"] = request.args["return_to"]
+        session["redirect"] = request.args["return_to"]
+    state = session.setdefault("analytics", {})
 
-    # Try loading in the token from previous session
-    if not app.config["creds"] and os.path.exists(app.config["pickle"]):
-        with open(app.config["pickle"], "rb") as fin:
-            app.config["creds"] = pickle.load(fin)
+    credentials = None
+    if "token" in state:
+        credentials = pickle.loads(state["token"])
 
-    # Check for token expiry
-    if app.config["creds"] and app.config["creds"].expired and app.config["creds"].refresh_token:
-        print("Refresh Token")
-        app.config["creds"].refresh(Request())
+    if credentials and credentials.expired and credentials.refresh_token:
+        credentials.refresh(Request())
 
-    if app.config["creds"] and app.config["creds"].valid:
-        print("Authorized")
-        return redirect(app.config["redirect"])
+    if credentials and credentials.valid:
+        return redirect(session.get("redirect", "/"))
 
-    flow = Flow.from_client_secrets_file(
-        './configuration/credentials.json', scopes)
-    flow.redirect_uri = os.getenv("API_URL") + url_for("oauth_callback")
+    authorization = {"web": session["google_cloud"]}
+    print(json.dumps(authorization, indent=4))
+
+    flow = Flow.from_client_config(authorization, scopes)
+    host = os.getenv("API_URL", request.host_url[:-1])
+    # flow.redirect_uri = "https://localhost:5000/oauth/callback/"
+    flow.redirect_uri = "{}{}".format(host, url_for("oauth_callback"))
 
     auth_url, app.config["state"] = flow.authorization_url(
         prompt='consent',
@@ -343,9 +438,11 @@ def oauth_authorize():
     return redirect(auth_url)
 
 
-@app.route("/oauth/deauthorize/")
+@app.route("/logout")
 def logout():
-    pass
+    session.clear()
+    flash("The information you entered has been cleared")
+    return redirect(url_for("about"))
 
 
 @app.route("/analytics/")

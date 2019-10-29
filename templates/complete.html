@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h2>Let's confirm what you entered</h2>
+    <dl class="row">
+        {% for section in state %}
+            <dt class="col-sm-3">{{ section }}</dt>
+            <dd class="col-sm-9">
+                {% for field_name, field_value in state[section] %}
+                    <dl class="row">
+                        <dt class="col-sm-4">{{ field_name }}</dt>
+                        <dd class="col-sm-8"> {{ field_value }}</dd>
+                    </dl>
+                {% endfor %}
+            </dd>
+        {% endfor %}
+
+    </dl>
+    <form class="well form-horizontal" method="POST" id="save_form">
+        <fieldset>
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary">
+                    Save
+                </button>
+            </div>
+        </fieldset>
+    </form>
+{% endblock %}
