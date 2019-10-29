@@ -169,8 +169,8 @@ def confirm_and_complete():
         output_token_pickle()
         output_config_yaml()
         session["confirm_and_complete"] = True
-        redirect(url_for("successful"))
         flash("Your configuration has been saved, run docker-compose restart to put changes in effect")
+        return redirect(url_for("done"))
 
     sensitive_fields = ["token", "primo_key"]
     state = {
@@ -185,7 +185,8 @@ def confirm_and_complete():
 
 @app.route("/setup/success")
 def done():
-    render_template("successful.html", progression=get_progression("confirm_and_complete"))
+    return render_template("successful.html", progression=get_progression("confirm_and_complete"))
+
 
 def output_config_yaml():
     target_directory = os.getenv("CONFIG_DIR", "./configuration")
@@ -196,7 +197,7 @@ def output_config_yaml():
                 "host": session["primo"]["primo_url"],
                 "api_key": session["primo"]["primo_key"],
             }
-        })
+        }, config_f)
 
 
 def output_token_pickle():

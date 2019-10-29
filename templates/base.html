@@ -23,24 +23,28 @@
     </script>
 </head>
 
-<nav>
-    <div class="jumbotron">
-        <h2><b>Let's setup Nebula!</b></h2>
-        <div aria-label="breadcrumb">
-            <ol class="breadcrumb progression">
-                {% for step, values in progression.items() %}
-                    <li class="breadcrumb-item {{ values["class"] }}">
-                        <a style="color: inherit !important;" href="{{ values["url"] }}">
-                            {{ step.replace('_', ' ') }}
-                            {% if values["completed"] %}
-                                <span class="oi oi-check"></span>
-                            {% endif %}
-                        </a>
-                    </li>
-                {% endfor %}
-            </ol>
+<nav class="jumbotron">
+    <div class="container">
+        <div class="row">
+            <h2 class="col-sm-9"><b>Let's setup Nebula!</b></h2>
+            <div class="col-md-3">
+                <a class="btn btn-light" href="{{ url_for("logout") }}">Reset Session</a>
+            </div>
+            <div aria-label="breadcrumb col-md-12">
+                <ol class="breadcrumb progression">
+                    {% for step, values in progression.items() %}
+                        <li class="breadcrumb-item {{ values["class"] }}">
+                            <a style="color: inherit !important;" href="{{ values["url"] }}">
+                                {{ step.replace('_', ' ') }}
+                                {% if values["completed"] %}
+                                    <span class="oi oi-check"></span>
+                                {% endif %}
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ol>
+            </div>
         </div>
-        <a class="btn btn-secondary" href="{{ url_for("logout") }}">Logout</a>
     </div>
 </nav>
 
