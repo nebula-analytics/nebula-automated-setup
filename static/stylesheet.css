@@ -1,3 +1,26 @@
-.error-details {padding: 40px 15px;text-align: center;}
-.error-actions {margin-top:15px;margin-bottom:15px;}
-.error-actions .btn { margin-right:10px; }
+.error-details {
+    padding: 40px 15px;
+    text-align: center;
+}
+
+.error-actions {
+    margin-top: 15px;
+    margin-bottom: 15px;
+}
+
+.error-actions .btn {
+    margin-right: 10px;
+}
+
+.progression .breadcrumb-item + .breadcrumb-item::before {
+    content: "›";
+    vertical-align: top;
+    color: #408080;
+    font-size: 35px;
+    line-height: 18px;
+}
+
+
+.progression .breadcrumb-item {
+        text-transform: capitalize;
+}

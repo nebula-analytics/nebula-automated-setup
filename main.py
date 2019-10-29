@@ -14,7 +14,7 @@ import json
 import yaml
 import subprocess
 
-from flask import Flask, jsonify, redirect, request, render_template
+from flask import Flask, jsonify, redirect, request, render_template, flash, session
 from flask import url_for
 from flask_cors import CORS
 from google.auth.transport.requests import Request
@@ -35,6 +35,8 @@ app.config["creds"] = None
 app.config["pickle"] = os.path.dirname(__file__) + "/configuration/token.pickle"
 app.config["state"] = None
 app.config["redirect"] = "/"
+
+app.secret_key = os.getenv("SECRET")
 viewIDs = []
 
 # Items here will not be redirected to authenticate
@@ -52,6 +54,10 @@ discovery_urls = {
     ("analytics", "v4"): "https://analyticsreporting.googleapis.com/$discovery/rest"
 }
 
+progression = [
+    "about", "primo", "google_cloud", "analytics"
+]
+
 
 class SetupError(Exception):
     pass
@@ -66,6 +72,92 @@ def validate_environment():
 @app.route("/")
 def index():
     return render_template('gaauthentication.html')
+
+
+@app.route("/setup/about")
+def about():
+    return
+
+
+@app.route("/setup/primo", methods=["GET", "POST"])
+def setup_primo():
+    if request.method == "POST":
+        fields = ["primo_url", "primo_key"]
+        data = request.form
+        state = session.setdefault("primo", {})
+
+        """Validate data"""
+        valid = True
+        for field in fields:
+            if not data.get(field, False):
+                flash("{} cannot be empty".format(field.replace("_", " ").capitalize()))
+                valid = False
+
+        if valid:
+            for field in fields:
+                state[field] = data.get(field)
+            return redirect(url_for('setup_google_cloud'))
+    return render_template('primo.html', progression=get_progression("primo"))
+
+
+@app.route("/setup/google_cloud", methods=["GET", "POST"])
+def setup_google_cloud():
+    if request.method == "POST":
+        fields = ["client_id", "client_key"]
+        data = request.form
+        state = session.setdefault("google_cloud", {})
+
+        """Validate data"""
+        valid = True
+        for field in fields:
+            if not data.get(field, False):
+                flash("{} cannot be empty".format(field.replace("_", " ").capitalize()))
+                valid = False
+
+        if valid:
+            for field in fields:
+                state[field] = data.get(field)
+            return redirect(url_for('setup_analytics'))
+    return render_template('google_cloud.html', progression=get_progression("google_cloud"))
+
+
+@app.route("/setup/analytics", methods=["GET", "POST"])
+def setup_analytics():
+    if request.method == "POST":
+        flash("TODO: Redirect")
+    return render_template('analytics.html', progression=get_progression("analytics"))
+
+
+def get_progression(current_step: str):
+    return {
+        progression[i]: {
+            "class": "active" if current_step == progression[i] else "",
+            "url": "/setup/{}".format(progression[i]),
+            "next": progression[i] if i < len(progression) else None
+        }
+        for i in range(len(progression))
+        if i <= progression.index(current_step)
+
+    }
+
+
+def update_config(new: dict):
+    with open("./configuration/credentials.json", "r") as fin:
+        data = json.load(fin)
+    update_recursive(data, new)
+    with open("./configuration/credentials.json", "w") as fout:
+        json.dump(data, fout)
+
+
+def update_recursive(dest: dict, values: dict):
+    for key, value in values.items():
+        if isinstance(value, dict):
+            if key in dest and isinstance(dest[key], dict):
+                update_recursive(dest[key], values[key])
+                continue
+        if not value:
+            continue
+        dest[key] = value
 
 
 @app.route("/auth", methods=["POST"])
@@ -95,7 +187,7 @@ def oauth_check():
                     'common_fields': ['title', 'identifier', "doc_id", "language", "_type"],
                     'excluded_fields': ["_id"],
                     'name_mapping': {"lang3": "language", "pnx_id": "doc_id"},
-                    'key_by':""
+                    'key_by': ""
 
                 }
             }
@@ -190,7 +282,8 @@ def finalise():
 
     with open('./configuration/config.yaml.secret', 'w') as f:
         yaml.dump(doc, f)
-    directory = "mv " + os.path.abspath('./configuration/config.yaml.secret') + " " + os.path.abspath('../nebula-background-worker/')
+    directory = "mv " + os.path.abspath('./configuration/config.yaml.secret') + " " + os.path.abspath(
+        '../nebula-background-worker/')
     subprocess.call(directory, shell=True)
     return render_template("successful.html")
 
@@ -221,7 +314,6 @@ def oauth_callback():
 @app.route("/oauth/authorize/", methods=['GET', 'POST'])
 def oauth_authorize():
     if "return_to" in request.args:
-        print("i'm here in app redirect")
         app.config["redirect"] = request.args["return_to"]
 
     # Try loading in the token from previous session

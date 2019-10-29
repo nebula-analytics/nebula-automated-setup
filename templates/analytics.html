@@ -1,0 +1,28 @@
+{% extends 'form.html' %}
+
+{% block form %}
+    <div class="form-group">
+        <label class="control-label" for="client_id">
+            {% if not session["analytics"] %}
+                You need to setup google cloud credentials in order to continue
+                <div class="form-group">
+                    <a href="{{ url_for("setup_google_cloud") }}" class="btn btn-secondary">
+                        back
+                        {#                    <span class="oi oi-check" aria-hidden="true"></span>#}
+                    </a>
+                </div>
+            {% else %}
+                To get access to google analytics you will need to authenticate with an account which has
+                access to the desired analytics data.
+
+                You may receive a warning telling you the token you generated has not been verified by google.
+            {% endif %}
+        </label>
+
+
+    </div>
+{% endblock %}
+
+{% if not session["analytics"] %}
+    {% block submit_attrs %}disabled{% endblock %}
+{% endif %}

@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+
+
+{% block content %}
+    <form class="well form-horizontal" action="{% block action %}{% endblock %}" method="POST" id="setup_form">
+        <fieldset>
+            {% block form %}
+            {% endblock %}
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary"  {% block submit_attrs %}{% endblock %}>
+                    Next
+{#                    <span class="oi oi-check" aria-hidden="true"></span>#}
+                </button>
+            </div>
+        </fieldset>
+    </form>
+{% endblock %}
