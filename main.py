@@ -197,6 +197,10 @@ def output_config_yaml():
             "primo": {
                 "host": session["primo"]["primo_url"],
                 "api_key": session["primo"]["primo_key"],
+            },
+            "analytics": {
+                "view_id": session["analytics"]["view_id"],
+                "path_to_credentials": "/config/analytics.pickle"
             }
         }, config_f)
 
