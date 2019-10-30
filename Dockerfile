@@ -16,6 +16,4 @@ RUN venv/bin/pip install --no-cache-dir -r  ./requirements.txt
 
 COPY ./ ./
 
-#RUN chown -R appuser:appuser ./
-#USER appuser
 CMD source venv/bin/activate && gunicorn -b :80 main:app
