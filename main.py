@@ -66,8 +66,9 @@ class SetupError(Exception):
 
 @app.before_first_request
 def validate_environment():
-    if "API_URL" not in os.environ:
-        os.environ["API_URL"] = "https://localhost:5000"
+    pass
+    # if "API_URL" not in os.environ:
+    #     os.environ["API_URL"] = "https://localhost:5000"
 
 
 @app.route("/")
@@ -202,7 +203,7 @@ def output_config_yaml():
 
 def output_token_pickle():
     target_directory = os.getenv("CONFIG_DIR", "./configuration")
-    token_file = os.path.join(target_directory, "token.pickle")
+    token_file = os.path.join(target_directory, "analytics.pickle")
     with open(token_file, "wb") as token_f:
         token_f.write(session["analytics"]["token"])
 
@@ -528,4 +529,4 @@ def require_analytics_id():
 
 
 if __name__ == '__main__':
-    app.run(threaded=False, debug=True, ssl_context='adhoc')
+    app.run(host="0.0.0.0", threaded=False, debug=True, ssl_context='adhoc')
