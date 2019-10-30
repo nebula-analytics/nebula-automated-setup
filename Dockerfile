@@ -4,7 +4,7 @@ RUN adduser -D appuser
 
 WORKDIR /home/appuser
 
-RUN apk update && apk add make automake gcc g++ subversion python3-dev libressl-dev
+RUN apk update && apk add make automake gcc g++ subversion python3-dev libressl-dev libffi-dev
 
 RUN python -m venv venv
 
