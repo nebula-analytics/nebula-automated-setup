@@ -4,3 +4,5 @@ venv
 *.pickle
 *.pyc
 *.secret
+
+configuration

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8"/>
+    <title></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+          integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
+            integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
+            crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"
+            integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1"
+            crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"
+            integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM"
+            crossorigin="anonymous"></script>
+    <link href="{{ url_for('static', filename='open-iconic/font/css/open-iconic-bootstrap.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='stylesheet.css') }}">
+    <title>{% block title %}{% endblock %} - Nebula Setup Tool</title>
+    <script>
+
+    </script>
+</head>
+
+<nav class="jumbotron">
+    <div class="container">
+        <div class="row">
+            <h2 class="col-sm-9"><b>Let's setup Nebula!</b></h2>
+            <div class="col-md-3">
+                <a class="btn btn-light" href="{{ url_for("logout") }}">Reset Session</a>
+            </div>
+            <div aria-label="breadcrumb col-md-12">
+                <ol class="breadcrumb progression">
+                    {% for step, values in progression.items() %}
+                        <li class="breadcrumb-item {{ values["class"] }}">
+                            <a style="color: inherit !important;" href="{{ values["url"] }}">
+                                {{ step.replace('_', ' ') }}
+                                {% if values["completed"] %}
+                                    <span class="oi oi-check"></span>
+                                {% endif %}
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ol>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<section class="content">
+    <div class="container">
+
+        {% for message in get_flashed_messages() %}
+            <div class="alert alert-primary" role="alert">
+                <div class="flash">{{ message }}</div>
+            </div>
+        {% endfor %}
+
+        {% block content %}{% endblock %}
+    </div>
+</section>
+</html>

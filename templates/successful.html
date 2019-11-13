@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+    <div class="container">
+        <div class="row">
+            <div class="media">
+                <img style="width: 100px; color: green" class="mr-4" src="{{ url_for("static", filename='open-iconic/svg/check.svg')}}"
+                     alt="check-symbol">
+                <div class="media-body">
+                    <h5 class="mt-0">Setup Complete</h5>
+                    <p>
+                        We've setup all the config for you, all you need to do now is run the following command and
+                        you're done.
+                    </p>
+                    <code>
+                        docker-compose restart
+                    </code>
+                    <p>
+                        If you had any issues getting set up we encourage you to raise a pull request
+                        <a href="https://github.com/nebula-analytics/nebula-docker/issues">here</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div><!-- /.container -->
+{% endblock %}

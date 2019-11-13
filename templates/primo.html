@@ -1,0 +1,46 @@
+{% extends 'form.html' %}
+
+{% block form %}
+
+    <div class="form-group">
+        <label class="control-label" for="primo_url">API Gateway location</label>
+        <div class="inputGroupContainer">
+            <div class="input-group mb-3">
+                <div class="input-group-prepend">
+                    <span class="input-group-text">https://</span>
+                </div>
+                <input id="primo_url" name="primo_url" placeholder="api-ap.hosted.exlibrisgroup.com/primo/v1"
+                       class="form-control"
+                       type="text">
+                <div class="input-group-append">
+                    <span class="input-group-text">/pnxs</span>
+                </div>
+            </div>
+        </div>
+        <small id="primo_url_help" class="form-text text-muted">
+            We need this information to tell us where your instance sits; see <a
+                href="https://developers.exlibrisgroup.com/primo/apis/#structure">primo's api documentation</a>
+        </small>
+    </div>
+
+    <div class="form-group">
+        <label class="control-label" for="primo_key">API Credentials</label>
+        <div class="inputGroupContainer">
+            <div class="input-group mb-3">
+
+                <div class="input-group-prepend">
+                    <span class="input-group-text">
+                        <span class="oi oi-lock-unlocked" title="API Key" aria-hidden="true"></span>
+                    </span>
+                </div>
+                <input id="primo_key" name="primo_key" placeholder="#######"
+                       class="form-control"
+                       type="password">
+            </div>
+        </div>
+        <small id="primo_url_help" class="form-text text-muted">
+            We require this to discover information about books that are looked up; see <a
+                href="https://developers.exlibrisgroup.com/primo/apis/#defining">primo's api documentation</a>
+        </small>
+    </div>
+{% endblock %}

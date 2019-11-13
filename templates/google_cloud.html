@@ -1,0 +1,81 @@
+{% extends 'form.html' %}
+
+{% block form %}
+
+    <div class="collapse" id="gcloud_help">
+        <div class="container">
+            <p class="lead">
+                In order to continue you will need to setup a free google cloud account and follow the instructions
+                <a href="https://developers.google.com/identity/protocols/OAuth2WebServer#creatingcred">here</a> to
+                create an oauth identity.
+            </p>
+            <p>See below for more information.</p>
+            <div style="display: flex; flex-flow: row">
+                <div class="card" style="width: 18rem;">
+                    <div class="card-body">
+                        <h5 class="card-title">OAuth Redirect URL</h5>
+                        <h6 class="card-subtitle mb-2 text-muted">Tells google where the token is allowed to be
+                            authorised</h6>
+                        <p class="card-text">Expected value<br/>https://[this webserver]]/setup/oauth/callback/</p>
+                        <a href="#" class="btn btn-primary btn-sm">More information</a>
+                    </div>
+                </div>
+                <div class="card" style="width: 18rem;">
+                    <div class="card-body">
+                        <h5 class="card-title">Permissions</h5>
+                        <h6 class="card-subtitle mb-2 text-muted">What this key is allowed to access</h6>
+                        <p class="card-text">Expected value<br/>https://www.googleapis.com/auth/analytics.readonly</p>
+                        <a href="#" class="btn btn-primary btn-sm">More information</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <a class="btn btn-primary" data-toggle="collapse" href="#gcloud_help" role="button" aria-expanded="false"
+       aria-controls="gcloud_help">
+        Toggle Help
+    </a>
+    <hr/>
+
+    <div class="form-group">
+        <label class="control-label" for="client_id">Client Identity</label>
+        <div class="inputGroupContainer">
+            <div class="input-group mb-3">
+                <div class="input-group-prepend">
+                    <span class="input-group-text">
+                        <span class="oi oi-person" title="Identity" aria-hidden="true"></span>
+                    </span>
+                </div>
+                <input id="client_id" name="client_id" placeholder="Google Identity"
+                       class="form-control"
+                       type="text">
+                <div class="input-group-append">
+                    <span class="input-group-text">.apps.googleusercontent.com</span>
+                </div>
+            </div>
+        </div>
+        <small id="client_id_help" class="form-text text-muted">
+            This allows us to interact with google cloud and act on your behalf for the given permissions
+        </small>
+    </div>
+
+    <div class="form-group">
+        <label class="control-label" for="client_secret">Client Secret</label>
+        <div class="inputGroupContainer">
+            <div class="input-group mb-3">
+
+                <div class="input-group-prepend">
+                    <span class="input-group-text">
+                        <span class="oi oi-lock-unlocked" title="Client Secret" aria-hidden="true"></span>
+                    </span>
+                </div>
+                <input id="client_secret" name="client_secret" placeholder="#######"
+                       class="form-control"
+                       type="password">
+            </div>
+        </div>
+        <small id="client_id_help" class="form-text text-muted">
+            This is the short string under the key 'client_secret' in the credentials.json.
+        </small>
+    </div>
+{% endblock %}
