@@ -1,27 +1,24 @@
 from __future__ import print_function
 
-import logging
-from collections import OrderedDict
-from logging.handlers import RotatingFileHandler
 import inspect
+import json
 import os
 import os.path
 import pickle
 import re
-import traceback as tb
-from typing import Callable
-from pickle import UnpicklingError
-import json
-import yaml
 import subprocess
+import traceback as tb
+from collections import OrderedDict
+from pickle import UnpicklingError
+from typing import Callable
 
+import yaml
 from flask import Flask, jsonify, redirect, request, render_template, flash, session
 from flask import url_for
 from flask_cors import CORS
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
-from pandas import DataFrame
 
 
 class AuthenticationException(Exception):
@@ -482,22 +479,6 @@ def access_realtime(auth):
         sort="rt:minutesAgo"
     ).execute()
     return jsonify(data)
-
-
-@app.route("/realtime/pages/")
-@require_access("analytics", "v3")
-def list_realtime_urls(auth):
-    ids = require_analytics_id()
-    data = auth.data().realtime().get(
-        ids=f"ga:{ids}",
-        metrics='rt:pageviews',
-        dimensions='rt:pagePath,rt:minutesAgo,rt:country,rt:city,rt:pageTitle',
-        sort="rt:minutesAgo"
-    ).execute()
-    columns = list(header["name"] for header in data["columnHeaders"])
-    df = DataFrame(data=data["rows"][3:], columns=columns)
-    queries_stripped = df["rt:pagePath"].replace([r"\?.+$"], [""], regex=True)
-    return jsonify({"pages": list(queries_stripped.unique())})
 
 
 @app.route("/analytics/views/")
